@@ -2,19 +2,15 @@ package crocking.client;
 
 import com.jme3.app.SimpleApplication;
 import com.jme3.export.binary.BinaryExporter;
-import com.jme3.export.xml.XMLExporter;
 import com.jme3.export.xml.XMLImporter;
-import com.jme3.material.Material;
-import com.jme3.math.ColorRGBA;
-import com.jme3.math.Vector3f;
 import com.jme3.network.Client;
+import com.jme3.network.Message;
+import com.jme3.network.MessageListener;
 import com.jme3.network.Network;
+import com.jme3.network.serializing.Serializer;
 import com.jme3.renderer.RenderManager;
-import com.jme3.scene.Geometry;
-import com.jme3.scene.shape.Box;
-import com.jme3.system.AppSettings;
-import com.jme3.system.JmeContext;
 import crocking.client.appstate.MenuAppState;
+import crocking.shared.network.message.*;
 import crocking.shared.player.Player;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -42,10 +38,28 @@ public class Main extends SimpleApplication {
             this.test();
             client = Network.connectToServer("localhost", 6413);
             client.start();
-            
+            byte[] playerStream = loadPlayer("greengnom");
+            Serializer.registerClass(PlayerDataMessage.class);
+            Serializer.registerClass(PlayerUpdateMessage.class);
+            client.addMessageListener(new ClientMessageListener());
+            if(playerStream != null)
+            {
+                PlayerDataMessage message = new PlayerDataMessage(playerStream);
+                client.send(message);
+                PlayerUpdateMessage update = new PlayerUpdateMessage((Object)19 , 0);
+                client.send(update);
+            }
             
         } catch (IOException ex) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    public class ClientMessageListener implements MessageListener<Client>
+    {
+        public void messageReceived(Client source, Message message)
+        {
+            
         }
     }
 
@@ -59,29 +73,27 @@ public class Main extends SimpleApplication {
         //TODO: add render code
     }
 
-    private void loadPlayer() {
+    private byte[] loadPlayer(String playerName)
+    {
         File playersDir = new File("data", "players");
-        File file = new File(playersDir, "greengnom.j3o");
+        File file = new File(playersDir, playerName + ".j3o");
         XMLImporter importer = XMLImporter.getInstance();
         
-        Player greengnom = null;
+        Player player = null;
         try {
-          greengnom = (Player) importer.load(file);
+          player = (Player) importer.load(file);
         } catch (IOException ex) {
           Logger.getLogger(Main.class.getName()).log(Level.SEVERE, "Error: Failed to save game!", ex);
         }
         
-        System.out.println(greengnom.name);
-        
-        
         BinaryExporter exporter = BinaryExporter.getInstance();
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        byte[] data = null;
         try {
-            exporter.save(greengnom, stream);
-            data = stream.toByteArray();
+            exporter.save(player, stream);
+            return stream.toByteArray();
         } catch (IOException ex) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
         }
         
         
